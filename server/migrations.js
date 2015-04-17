@@ -11,24 +11,44 @@ Meteor.startup(function () {
   });
 });
 
+Meteor.methods({
+  removeMigration: function (name) {
+    if (isAdmin(Meteor.user())) {
+      console.log('// removing migration: ' + name);
+      Migrations.remove({name: name});
+    }
+  }
+});
+
 // wrapper function for all migrations
 var runMigration = function (migrationName) {
-  // migration updatePostStatus: make sure posts have a status
-  if (!Migrations.findOne({name: migrationName})) {
-    console.log("//----------------------------------------------------------------------//");
-    console.log("//------------//    Starting "+migrationName+" Migration    //-----------//");
-    console.log("//----------------------------------------------------------------------//");
-    Migrations.insert({name: migrationName, startedAt: new Date(), completed: false});
+  var migration = Migrations.findOne({name: migrationName});
 
-    // execute migration function
-    var itemsAffected = migrationsList[migrationName]() || 0;
-
-    Migrations.update({name: migrationName}, {$set: {finishedAt: new Date(), completed: true, itemsAffected: itemsAffected}});
-    console.log("//----------------------------------------------------------------------//");
-    console.log("//------------//     Ending "+migrationName+" Migration     //-----------//");
-    console.log("//----------------------------------------------------------------------//");
+  if (migration){
+    if(typeof migration.finishedAt === 'undefined'){
+      // if migration exists but hasn't finished, remove it and start fresh
+      console.log('!!! Found incomplete migration "'+migrationName+'", removing and running again.');
+      Migrations.remove({name: migrationName});
+    }else{
+      // do nothing
+      // console.log('Migration "'+migrationName+'" already exists, doing nothing.')
+      return;
+    }
   }
-}
+
+  console.log("//----------------------------------------------------------------------//");
+  console.log("//------------//    Starting "+migrationName+" Migration    //-----------//");
+  console.log("//----------------------------------------------------------------------//");
+  Migrations.insert({name: migrationName, startedAt: new Date(), completed: false});
+
+  // execute migration function
+  var itemsAffected = migrationsList[migrationName]() || 0;
+
+  Migrations.update({name: migrationName}, {$set: {finishedAt: new Date(), completed: true, itemsAffected: itemsAffected}});
+  console.log("//----------------------------------------------------------------------//");
+  console.log("//------------//     Ending "+migrationName+" Migration     //-----------//");
+  console.log("//----------------------------------------------------------------------//");
+};
 
 var migrationsList = {
   updatePostStatus: function () {
@@ -38,11 +58,12 @@ var migrationsList = {
       Posts.update(post._id, {$set: {status: 2}});
       console.log("---------------------");
       console.log("Post: "+post.title);
-      console.log("Updating status to approved");  
+      console.log("Updating status to approved");
     });
     return i;
   },
   updateCategories: function () {
+    if (typeof Categories === "undefined" || Categories === null) return;
     var i = 0;
     Categories.find({slug: {$exists : false}}).forEach(function (category) {
         i++;
@@ -51,11 +72,11 @@ var migrationsList = {
         console.log("---------------------");
         console.log("Category: "+category.name);
         console.log("Updating category with new slug: "+slug);
-    
     });
     return i;
   },
   updatePostCategories: function () {
+    if (typeof Categories === "undefined" || Categories === null) return;
     var i = 0;
     Posts.find().forEach(function (post) {
       i++;
@@ -108,21 +129,24 @@ var migrationsList = {
       i++;
       console.log('> Updating user '+user._id+' ('+user.username+')');
 
+      var properties = {};
       // update user slug
       if(getUserName(user))
-        Meteor.users.update(user._id, {$set:{slug: slugify(getUserName(user))}});
+        properties.slug = slugify(getUserName(user));
 
       // update user isAdmin flag
       if(typeof user.isAdmin === 'undefined')
-        Meteor.users.update(user._id, {$set: {isAdmin: false}});
+        properties.isAdmin = false;
 
       // update postCount
       var postsByUser = Posts.find({userId: user._id});
-      Meteor.users.update(user._id, {$set: {postCount: postsByUser.count()}});
-      
+      properties.postCount = postsByUser.count();
+
       // update commentCount
       var commentsByUser = Comments.find({userId: user._id});
-      Meteor.users.update(user._id, {$set: {commentCount: commentsByUser.count()}});
+      properties.commentCount = commentsByUser.count();
+
+      Meteor.users.update(user._id, {$set:properties});
 
     });
     return i;
@@ -179,7 +203,7 @@ var migrationsList = {
   },
   commentsSubmittedToCreatedAt: function () {
     var i = 0;
-    Comments.find().forEach(function (comment) {
+    Comments.find({createdAt: {$exists: false}}).forEach(function (comment) {
       i++;
       console.log("Comment: "+comment._id);
       Comments.update(comment._id, { $rename: { 'submitted': 'createdAt'}}, {multi: true, validate: false});
@@ -205,7 +229,7 @@ var migrationsList = {
         console.log("Posts: "+post.title);
         var createdAt = new Date(post.createdAt);
         var submitted = new Date(post.submitted);
-        console.log(createdAt)
+        console.log(createdAt);
         Posts.update(post._id, { $set: { 'createdAt': createdAt, submitted: submitted}}, {multi: true, validate: false});
         console.log("---------------------");
       }
@@ -248,12 +272,255 @@ var migrationsList = {
   },
   parentToParentCommentId: function () {
     var i = 0;
-    Comments.find({parentCommentId: {$exists : false}}).forEach(function (comment) {
+    Comments.find({parent: {$exists: true}, parentCommentId: {$exists : false}}).forEach(function (comment) {
       i++;
       console.log("Comment: "+comment._id);
       Comments.update(comment._id, { $set: { 'parentCommentId': comment.parent}}, {multi: true, validate: false});
       console.log("---------------------");
     });
     return i;
-  }
-}
+  },
+  addLastCommentedAt: function () {
+    var i = 0;
+    Posts.find({$and: [
+      {$or: [{comments: {$gt: 0}}, {commentCount: {$gt: 0}}]},
+      {lastCommentedAt: {$exists : false}}
+    ]}).forEach(function (post) {
+      i++;
+      console.log("Post: "+post._id);
+      var postComments = Comments.find({$or: [{postId: post._id}, {post: post._id}]}, {sort: {postedAt: -1}}).fetch();
+      var lastComment;
+      if (_.isEmpty(postComments)) {
+        console.log('postComments from post '+post._id+' is empty. Skipping.');
+        return;
+      }
+      lastComment = postComments[0];
+      Posts.update(post._id, { $set: { lastCommentedAt: lastComment.postedAt}}, {multi: false, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  commentsToCommentCount: function () {
+    var i = 0;
+    Posts.find({comments: {$exists : true}, commentCount: {$exists : false}}).forEach(function (post) {
+      i++;
+      console.log("Post: "+post._id);
+      Posts.update(post._id, { $set: { 'commentCount': post.comments}, $unset: { 'comments': ''}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  addCommentersToPosts: function () {
+    var i = 0;
+    Comments.find().forEach(function (comment) {
+      i++;
+      console.log("Comment: "+comment._id);
+      console.log("Post: "+comment.postId);
+      Posts.update(comment.postId, { $addToSet: { 'commenters': comment.userId}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  createVotes: function () { // create empty user.votes object
+    var i = 0;
+    Meteor.users.find({votes: {$exists : false}}).forEach(function (user) {
+      i++;
+      console.log("User: "+user._id);
+      Meteor.users.update(user._id, {$set: {votes: {}}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  moveVotesFromProfile: function () {
+    var i = 0;
+    Meteor.users.find().forEach(function (user) {
+      i++;
+      console.log("User: "+user._id);
+      Meteor.users.update(user._id, {
+        $rename: {
+          'profile.upvotedPosts': 'votes.upvotedPosts',
+          'profile.downvotedPosts': 'votes.downvotedPosts',
+          'profile.upvotedComments': 'votes.upvotedComments',
+          'profile.downvotedComments': 'votes.downvotedComments'
+        }
+      }, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  addHTMLBody: function () {
+    var i = 0;
+    Posts.find({body: {$exists : true}}).forEach(function (post) {
+      i++;
+      var htmlBody = sanitize(marked(post.body));
+      console.log("Post: "+post._id);
+      Posts.update(post._id, { $set: { 'htmlBody': htmlBody}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  addHTMLComment: function () {
+    var i = 0;
+    Comments.find({body: {$exists : true}}).forEach(function (comment) {
+      i++;
+      var htmlBody = sanitize(marked(comment.body));
+      console.log("Comment: "+comment._id);
+      Comments.update(comment._id, { $set: { 'htmlBody': htmlBody}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  clicksToClickCount: function () {
+    var i = 0;
+    Posts.find({"clicks": {$exists: true}, "clickCount": {$exists : false}}).forEach(function (post) {
+      i++;
+      console.log("Post: " + post._id);
+      Posts.update(post._id, { $set: { 'clickCount': post.clicks}, $unset: { 'clicks': ''}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  commentsCountToCommentCount: function () {
+    var i = 0;
+    Posts.find({"commentCount": {$exists : false}}).forEach(function (post) {
+      i++;
+      console.log("Post: " + post._id);
+      var result = Posts.update({_id: post._id}, { $set: { 'commentCount': post.commentsCount}, $unset: {'commentsCount': ""}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  userDataCommentsCountToCommentCount: function(){
+    var i = 0;
+    Meteor.users.find({'commentCount': {$exists: false}}).forEach(function(user){
+      i++;
+      var commentCount = Comments.find({userId: user._id}).count();
+      console.log("User: " + user._id);
+      Meteor.users.update(user._id, {$unset: {data: ""}, $set: {'commentCount': commentCount}});
+      console.log("---------------------");
+    });
+    return i;
+   },
+  clicksToClickCountForRealThisTime: function () { // since both fields might be co-existing, add to clickCount instead of overwriting it
+    var i = 0;
+    Posts.find({'clicks': {$exists: true}}).forEach(function (post) {
+      i++;
+      console.log("Post: " + post._id);
+      var result = Posts.update(post._id, { $inc: { 'clickCount': post.clicks}, $unset: {'clicks': ""}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  normalizeCategories: function () {
+    var i = 0;
+    Posts.find({'categories': {$exists: true}}).forEach(function (post) {
+      i++;
+      console.log("Post: " + post._id);
+      var justCategoryIds = post.categories.map(function (category){
+        return category._id;
+      });
+      var result = Posts.update(post._id, {$set: {categories: justCategoryIds, oldCategories: post.categories}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  cleanUpStickyProperty: function () {
+    var i = 0;
+    Posts.find({'sticky': {$exists: false}}).forEach(function (post) {
+      i++;
+      console.log("Post: " + post._id);
+      var result = Posts.update(post._id, {$set: {sticky: false}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  show0112ReleaseNotes: function () {
+    var i = 0;
+    // if this is the 0.11.2 update, the first run event will not exist yet.
+    // if that's the case, make sure to still show release notes
+    if (!Events.findOne({name: 'firstRun'})) {
+      Releases.update({number:'0.11.2'}, {$set: {read:false}});
+    }
+    return i;
+  },
+  removeThumbnailHTTP: function () {
+    var i = 0;
+    Posts.find({thumbnailUrl: {$exists : true}}).forEach(function (post) {
+      i++;
+      var newThumbnailUrl = post.thumbnailUrl.replace("http:", "");
+      console.log("Post: "+post._id);
+      Posts.update(post._id, { $set: { 'thumbnailUrl': newThumbnailUrl}}, {multi: true, validate: false});
+      console.log("---------------------");
+    });
+    return i;
+  },
+  updateUserNames: function () {
+    var i = 0;
+    var allUsers = Meteor.users.find({username: {$exists: true}});
+    console.log('> Found '+allUsers.count()+' users.\n');
+
+    allUsers.forEach(function(user){
+      i++;
+
+      // Perform the same transforms done by useraccounts with `lowercaseUsernames` set to `true`
+      var oldUsername = user.username;
+      var username = user.username;
+      username = username.trim().replace(/\s+/gm, ' ');
+      user.profile.username = user.profile.name || username;
+      delete user.profile.name;
+      username = username.toLowerCase().replace(/\s+/gm, '');
+      user.username = username;
+
+      if (user.emails && user.emails.length > 0) {
+        _.each(user.emails, function(email){
+          email.address = email.address.toLowerCase().replace(/\s+/gm, '');
+        });
+      }
+
+      console.log('> Updating user '+user._id+' ('+oldUsername+' -> ' + user.username + ')');
+
+      try {
+        Meteor.users.update(user._id, {
+          $set: {
+            emails: user.emails,
+            profile: user.profile,
+            username: user.username,
+          },
+        });
+      }
+      catch (err) {
+        console.warn('> Unable to convert username ' + user.username + ' to lowercase!');
+        console.warn('> Please try to fix it by hand!! :(');
+      }
+    });
+    return i;
+  },
+  changeColorNames: function () {
+    var i = 0;
+    var settings = Settings.collection.findOne();
+    var set = {};
+
+    if (!!settings) {
+
+      if (!!settings.buttonColor)
+        set.accentColor = settings.buttonColor;
+
+      if (!!settings.buttonTextColor)
+        set.accentContrastColor = settings.buttonTextColor;
+
+      if (!!settings.buttonColor)
+        set.secondaryColor = settings.headerColor;
+
+      if (!!settings.buttonColor)
+        set.secondaryContrastColor = settings.headerTextColor;
+
+      if (!_.isEmpty(set)) {
+        Settings.collection.update(settings._id, {$set: set}, {validate: false});
+      }
+
+    }
+    return i;
+  },
+};
+
+// TODO: normalize categories?

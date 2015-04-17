@@ -1,21 +1,13 @@
 <template name="mobile_nav">
   <div class="mobile-nav">
     <div class="mobile-nav-inner">
-
       <ul class="mobile-menu">
-        {{#each navItems}}
+        {{#each mobileNav}}
           <li>
-            {{> UI.dynamic template=this}}
+            {{> Template.dynamic template=getTemplate data=mobileContext}}
           </li>
         {{/each}}
       </ul>
-
-      {{#if canView}}
-        <ul class="mobile-submit">
-          <li><a id="submit" class="submit button" href="/submit">{{i18n "Post"}}</a></li>
-        </ul>
-      {{/if}}
-
     </div>
   </div>
 </template>

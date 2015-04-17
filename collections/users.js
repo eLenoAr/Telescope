@@ -1,6 +1,5 @@
 var Schema = {};
-
-Schema.User = new SimpleSchema({
+var userSchemaObject = { 
   _id: {
     type: String,
     optional: true
@@ -22,18 +21,44 @@ Schema.User = new SimpleSchema({
   createdAt: {
     type: Date
   },
-  profile: {
-    type: Schema.UserProfile,
-    optional: true
+  profile: { // public and modifiable
+    type: Object,
+    optional: true,
+    blackbox: true
+  },
+  data: { // public but not modifiable
+    type: Object,
+    optional: true,
+    blackbox: true
+  },
+  votes: { // used for votes only
+    type: Object,
+    optional: true,
+    blackbox: true
   },
   services: {
     type: Object,
     optional: true,
     blackbox: true
   }
+};
+
+
+_.each(addToUserSchema, function(item){
+  userSchemaObject[item.propertyName] = item.propertySchema;
 });
+Schema.User = new SimpleSchema(userSchemaObject);
 
 // Meteor.users.attachSchema(Schema.User);
+
+Meteor.users.deny({
+  update: function(userId, post, fieldNames) {
+    if(isAdminById(userId))
+      return false;
+    // deny the update if it contains something other than the profile field
+    return (_.without(fieldNames, 'profile', 'username', 'slug').length > 0);
+  }
+});
 
 Meteor.users.allow({
   update: function(userId, doc){

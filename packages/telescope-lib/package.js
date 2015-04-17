@@ -1,6 +1,10 @@
-Package.describe({summary: "Telescope library package"});
+Package.describe({
+  summary: "Telescope library package",
+  version: '0.2.9',
+  name: "telescope-lib"
+});
 
-Package.on_use(function (api) {
+Package.onUse(function (api) {
 
   api.use([
     'underscore'
@@ -10,9 +14,27 @@ Package.on_use(function (api) {
     'jquery'
   ], 'client');
 
-  api.add_files(['lib/autolink.js', 'lib/deep_extend.js', 'lib/camel_to_dash.js'], ['client', 'server']);
+  api.add_files([
+    'lib/lib.js',
+    'lib/deep.js',
+    'lib/deep_extend.js',
+    'lib/autolink.js',
+    'lib/permissions.js'
+  ], ['client', 'server']);
 
   api.add_files(['lib/client/jquery.exists.js'], ['client']);
-  
-  api.export(['deepExtend', 'camelToDash']);
+
+  api.export([
+    'deepExtend',
+    'camelToDash',
+    'dashToCamel',
+    'camelCaseify',
+    'removeSetting',
+    'getThemeSetting',
+    'getSiteUrl',
+    'trimWords',
+    'can',
+    '_',
+    'capitalise'
+  ]);
 });

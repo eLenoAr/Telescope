@@ -1,57 +1,64 @@
 Template[getTemplate('nav')].helpers({
-  navItems: function () {
-    return navItems;
+  headerClass: function () {
+    var headerClass = "";
+    var bgBrightness = tinycolor(Settings.get('headerColor')).getBrightness();
+    if (bgBrightness < 50) {
+      headerClass += " dark-bg";
+    } else if (bgBrightness < 130) {
+      headerClass += " medium-dark-bg";
+    } else if (bgBrightness < 220) {
+      headerClass += " medium-light-bg";
+    } else if (bgBrightness < 255) {
+      headerClass += " light-bg";
+    } else {
+      headerClass += " white-bg";
+    }
+    return headerClass;
   },
-  site_title: function(){
-    return getSetting('title');
+  primaryNav: function () {
+    return _.sortBy(primaryNav, 'order');
   },
-  logo_url: function(){
-    return getSetting('logoUrl');
+  hasPrimaryNav: function () {
+    return !!primaryNav.length;
   },
-  logo_height: function(){
-    return getSetting('logoHeight');
+  secondaryNav: function () {
+    return _.sortBy(secondaryNav, 'order');
   },
-  logo_width: function(){
-    return getSetting('logoWidth');
+  hasSecondaryNav: function () {
+    return !!secondaryNav.length;
   },
-  logo_top: function(){
-    return Math.floor((70-getSetting('logoHeight'))/2);
-  },  
-  logo_offset: function(){
-    return -Math.floor(getSetting('logoWidth')/2);
+  dropdownClass: function () {
+    var dropdownClass = "";
+    // only use dropdowns for top nav
+    if (this.length > 3) {
+      dropdownClass += "long-dropdown";
+    }
+    if (Settings.get('navLayout', 'top-nav') == 'top-nav' && getThemeSetting('useDropdowns', true)) {
+      dropdownClass += "has-dropdown";
+    } else {
+      dropdownClass += "no-dropdown";
+    }
+    return dropdownClass;
   },
-  intercom: function(){
-    return !!getSetting('intercomId');
+  hasMoreThanThreeItems: function () {
+    console.log(this)
+    return this.length > 3;
   },
-  canPost: function(){
-    return canPost(Meteor.user());
+  logoTemplate: function () {
+    return getTemplate('logo');
   },
-  requirePostsApproval: function(){
-    return getSetting('requirePostsApproval');
+  navZoneTemplate: function () {
+    return getTemplate('navZone');
+  },
+  getTemplate: function () {
+    return getTemplate(this.template);
   }
 });
 
-Template[getTemplate('nav')].rendered=function(){
-
-  if(!Meteor.user()){
-    $('.login-link-text').text("Sign Up/Sign In");
-  }else{
-    $('#login-buttons-logout').before('<a href="/users/'+Meteor.user().slug+'" class="account-link button">View Profile</a>');
-    $('#login-buttons-logout').before('<a href="/account" class="account-link button">Edit Account</a>');
-  }
-};
-
 Template[getTemplate('nav')].events({
-  'click #logout': function(e){
-    e.preventDefault();
-    Meteor.logout();
-  },
   'click .mobile-menu-button': function(e){
     e.preventDefault();
+    e.stopPropagation(); // Make sure we don't immediately close the mobile nav again. See layout.js event handler.
     $('body').toggleClass('mobile-nav-open');
-  },
-  'click .login-header': function(e){
-    e.preventDefault();
-    Router.go('/account');
   }
 });

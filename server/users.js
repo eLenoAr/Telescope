@@ -1,107 +1,84 @@
 Accounts.onCreateUser(function(options, user){
+
+  // ------------------------------ Properties ------------------------------ //
+
   var userProperties = {
     profile: options.profile || {},
     karma: 0,
     isInvited: false,
-    isAdmin: false,
     postCount: 0,
     commentCount: 0,
-    invitedCount: 0
+    invitedCount: 0,
+    votes: {
+      upvotedPosts: [],
+      downvotedPosts: [],
+      upvotedComments: [],
+      downvotedComments: []
+    }
   };
   user = _.extend(user, userProperties);
 
+  // set email on profile
   if (options.email)
     user.profile.email = options.email;
-    
+
+  // if email is set, use it to generate email hash
   if (getEmail(user))
     user.email_hash = getEmailHash(user);
-  
-  if (!user.profile.name)
-    user.profile.name = user.username;
-  
-  // set notifications default preferences
-  user.profile.notifications = {
-    users: false,
-    posts: false,
-    comments: true,
-    replies: true
-  };
+
+  // set username on profile
+  if (!user.profile.username)
+    user.profile.username = user.username;
 
   // create slug from username
   user.slug = slugify(getUserName(user));
 
-  // if this is the first user ever, make them an admin
-  if (!Meteor.users.find().count() )
-    user.isAdmin = true;
+  // if this is not a dummy account, and is the first user ever, make them an admin
+  user.isAdmin = (!user.profile.isDummy && Meteor.users.find({'profile.isDummy': {$ne: true}}).count() === 0) ? true : false;
 
-  // give new users a few invites (default to 3)
-  user.inviteCount = getSetting('startInvitesCount', 3);
+  // ------------------------------ Callbacks ------------------------------ //
+
+  // run all post submit client callbacks on properties object successively
+  clog('// Start userCreatedCallbacks');
+  user = userCreatedCallbacks.reduce(function(result, currentFunction) {
+    clog('// Running '+currentFunction.name+'…');
+    return currentFunction(result);
+  }, user);
+  clog('// Finished userCreatedCallbacks');
+  // clog('// User object:');
+  // clog(user);
+
+  // ------------------------------ Analytics ------------------------------ //
 
   trackEvent('new user', {username: user.username, email: user.profile.email});
-
-  // if user has already filled in their email, add them to MailChimp list
-  if(user.profile.email)
-    addToMailChimpList(user);
-
-  // send notifications to admins
-  var admins = Meteor.users.find({isAdmin: true});
-  admins.forEach(function(admin){
-    if(getUserSetting('notifications.users', false, admin)){
-      var notification = getNotificationContents({
-        event: 'newUser',
-        properties: {
-          username: getUserName(user),
-          profileUrl: getProfileUrl(user)
-        },
-        userId: admin._id
-      }, 'email');
-      sendNotification(notification, admin);
-    }
-  });
-
 
   return user;
 });
 
-getEmailHash = function(user){
-  // todo: add some kind of salt in here
-  return CryptoJS.MD5(getEmail(user).trim().toLowerCase() + user.createdAt).toString();
-};
-
-addToMailChimpList = function(user){
-  // add a user to a MailChimp list.
-  // called when a new user is created, or when an existing user fills in their email
-  if((MAILCHIMP_API_KEY=getSetting('mailChimpAPIKey')) && (MAILCHIMP_LIST_ID=getSetting('mailChimpListId'))){
-
-    var email = getEmail(user);
-    if (! email)
-      throw 'User must have an email address';
-
-    console.log('adding "'+email+'" to MailChimp list…');
-    
-    var mailChimp = new MailChimpAPI(MAILCHIMP_API_KEY, { version : '1.3', secure : false });
-    
-    mailChimp.listSubscribe({
-      id: MAILCHIMP_LIST_ID,
-      email_address: email,
-      double_optin: false
-    });
-  }
-};
 
 Meteor.methods({
-  changeEmail: function(newEmail) {
-    Meteor.users.update(Meteor.userId(), {$set: {emails: [{address: newEmail}]}});
+  changeEmail: function (userId, newEmail) {
+    var user = Meteor.users.findOne(userId);
+    if (can.edit(Meteor.user(), user) !== true) {
+      throw new Meteor.Error("Permission denied");
+    }
+    Meteor.users.update(
+      userId,
+      {$set: {
+          emails: [{address: newEmail, verified: false}],
+          email_hash: Gravatar.hash(newEmail),
+          // Just in case this gets called from somewhere other than /client/views/users/user_edit.js
+          "profile.email": newEmail
+        }
+      }
+    );
   },
-  numberOfPostsToday: function(){
-    console.log(numberOfItemsInPast24Hours(Meteor.user(), Posts));
-  },
-  numberOfCommentsToday: function(){
-    console.log(numberOfItemsInPast24Hours(Meteor.user(), Comments));
-  },
-  testEmail: function(){
-    Email.send({from: 'test@test.com', to: getEmail(Meteor.user()), subject: 'Telescope email test', text: 'lorem ipsum dolor sit amet.'});
-  },
+  // numberOfPostsToday: function(){
+  //   console.log(numberOfItemsInPast24Hours(Meteor.user(), Posts));
+  // },
+  // numberOfCommentsToday: function(){
+  //   console.log(numberOfItemsInPast24Hours(Meteor.user(), Comments));
+  // },
   testBuffer: function(){
     // TODO
   },
@@ -111,12 +88,5 @@ Meteor.methods({
     var ageInHours = (new Date().getTime() - object.submitted) / (60 * 60 * 1000);
     var newScore = baseScore / Math.pow(ageInHours + 2, 1.3);
     return Math.abs(object.score - newScore);
-  },
-  setEmailHash: function(user){
-    var email_hash = CryptoJS.MD5(getEmail(user).trim().toLowerCase()).toString();
-    Meteor.users.update(user._id, {$set : {email_hash : email_hash}});
-  },
-  addCurrentUserToMailChimpList: function(){
-    addToMailChimpList(Meteor.user());
   }
 });

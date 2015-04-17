@@ -1,31 +1,102 @@
 Package.describe({summary: "Telescope base package"});
 
-Package.on_use(function (api) {
+Package.onUse(function (api) {
 
-  api.use(['telescope-lib'], ['client', 'server']);
+  api.use(['telescope-i18n', 'telescope-lib', 'aldeed:simple-schema', 'check']);
+  api.imply(['aldeed:simple-schema']);
 
   api.add_files(['lib/base.js'], ['client', 'server']);
-  api.add_files(['lib/base_client.js'], ['client']);
-  api.add_files(['lib/base_server.js'], ['server']);
+  api.add_files(['lib/colors.js'], ['client', 'server']);
+  api.add_files(['lib/icons.js'], ['client', 'server']);
 
   api.export([
-    'adminNav', 
-    'viewNav', 
+    'postStatuses',
+    'STATUS_PENDING',
+    'STATUS_APPROVED',
+    'STATUS_REJECTED',
+
+    'adminMenu',
+    'viewsMenu',
+    'userMenu',
+
     'addToPostSchema', 
     'addToCommentsSchema', 
     'addToSettingsSchema', 
+    'addToUserSchema',
+    
+    'registerPostProperty',
+    'registerCommentProperty',
+    'registerSetting',
+    'registerUserProperty',
+
     'preloadSubscriptions', 
-    'navItems', 
-    'viewParameters', 
+    'primaryNav', 
+    'secondaryNav', 
+    'mobileNav',
+    'viewParameters',
+
+    'footerModules',
+    'heroModules',
+    'threadModules',
+    'postListTopModules',
     'postModules',
-    'modulePositions',
+    'postThumbnail',
+    'postHeading',
+    'postMeta',
+
+    'postClassCallbacks',
+
+    'postSubmitRenderedCallbacks',
     'postSubmitClientCallbacks',
-    'postSubmitServerCallbacks',
+    'postSubmitMethodCallbacks',
+    'postAfterSubmitMethodCallbacks',
+
+    'postApproveCallbacks',
+
+    'postEditRenderedCallbacks',
     'postEditClientCallbacks',
+    'postEditMethodCallbacks',
+    'postAfterEditMethodCallbacks',
+
+    'commentClassCallbacks',
+
+    'commentSubmitRenderedCallbacks',
     'commentSubmitClientCallbacks',
-    'commentSubmitServerCallbacks',
+    'commentSubmitMethodCallbacks',
+    'commentAfterSubmitMethodCallbacks',
+
+    'commentEditRenderedCallbacks',
     'commentEditClientCallbacks',
+    'commentEditMethodCallbacks',
+    'commentAfterEditMethodCallbacks',
+
+    'upvoteCallbacks',
+    'downvoteCallbacks',
+    'cancelUpvoteCallbacks',
+    'cancelDownvoteCallbacks',
+    'upvoteMethodCallbacks',
+    'downvoteMethodCallbacks',
+    'cancelUpvoteMethodCallbacks',
+    'cancelDownvoteMethodCallbacks',
+
+    'userEditRenderedCallbacks',
+    'userEditClientCallbacks',
+    'userProfileCompleteChecks',
+    'userProfileDisplay',
+    'userProfileEdit',
+    'userCreatedCallbacks',
+
     'getTemplate',
-    'templates'
+    'templates',
+
+    'getIcon',
+    'icons',
+
+    'colorTable',
+    'registerElementColor',
+
+    'themeSettings',
+
+    'getVotePower'
     ]);
 });
