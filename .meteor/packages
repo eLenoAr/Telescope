@@ -1,99 +1,44 @@
-# Meteor packages used by this project, one per line.
-#
-# 'meteor add' and 'meteor remove' will edit this file for you,
-# but you can also edit it by hand.
+############ Nova Core ############
 
-# Meteor Packages
+nova:core # do not remove!
 
-standard-app-packages
-backbone
-accounts-base
-accounts-password
-accounts-twitter
-spiderable
-email
-accounts-facebook
-service-configuration
-accounts-ui
-reactive-var
-http
+############ Optional Packages ############
 
-# Atmosphere Packages
+nova:settings
+nova:users
+nova:posts
+nova:comments
+nova:newsletter
+nova:search
+nova:notifications
+nova:getting-started
+nova:categories
+nova:voting
+nova:forms
+nova:embedly
+nova:api
+nova:email
+nova:rss
+# nova:subscribe
+# nova:cloudinary
 
-iron:router
+############ Customizable Packages ############
 
-meteorhacks:fast-render
-meteorhacks:subs-manager
-meteorhacks:npm
+nova:base-components
+nova:base-styles
+nova:base-routes
+nova:email-templates
+nova:i18n-en-us
 
-aldeed:autoform@5.1.2
-aldeed:collection2
-aldeed:simple-schema@1.3.2
-aldeed:template-extension
+accounts-password@1.3.3
+# accounts-twitter
+# accounts-facebook
 
-mrt:jquery-hotkeys
-mrt:cookies
+############ Debug Packages ############
 
-ccan:cssreset # CSS reset (Must come before any other css)
-cmather:handlebars-server
-sacha:spin
-sacha:juice
-chuangbo:marked
-percolatestudio:synced-cron
-npm-container
-matb33:collection-hooks
-djedi:sanitize-html
-rajit:bootstrap3-datepicker
-bengott:avatar@0.7.6
-jparker:gravatar
-tap:i18n
-useraccounts:unstyled@1.8.1
-tsega:bootstrap3-datetimepicker@3.1.3_1
-momentjs:moment
-aslagle:reactive-table
-aramk:tinycolor
-fortawesome:fontawesome
-fourseven:scss
-manuelschoebel:ms-seo
+nova:debug
+# nova:kadira
 
-# Testing
+############ Your Packages ############
 
-# sanjo:jasmine
-# velocity:html-reporter
-
-# Telescope Packages (Required)
-
-telescope-base
-telescope-lib
-telescope-i18n
-
-# Telescope Packages (Optional)
-
-telescope-datetimepicker
-telescope-theme-base
-telescope-module-share
-telescope-api
-telescope-rss
-telescope-search
-telescope-tags
-telescope-theme-hubble
-telescope-email
-telescope-embedly
-telescope-newsletter
-telescope-daily
-telescope-update-prompt
-telescope-kadira
-telescope-notifications
-telescope-singleday
-telescope-invites
-telescope-post-by-feed
-telescope-releases
-telescope-getting-started
-telescope-subscribe-to-posts
-telescope-tagline-banner
-telescope-settings
-telescope-sitemap
-telescope-messages
-telescope-pages
-
-# Custom Packages
+# my-custom-package
